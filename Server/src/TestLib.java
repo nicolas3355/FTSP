@@ -11,7 +11,7 @@ public class TestLib {
 		return x * y;
 	}
 	
-	public static sqrt(double x) {
+	public static double sqrt(double x) {
 		double s = x/2;
 		for (int i = 0; i < 50; ++i) {
 			s = 0.5*(s + x/s);

@@ -9,12 +9,10 @@ public class Server {
 
 	private int port;
 	private static String backupId = "127.0.0.1";
-	private String[] servers;
 	ServerSocket welcomeSocket;
 	
-	public Server(int port, String[] servers) throws IOException{
+	public Server(int port) throws IOException{
 		this.port = port;
-		servers = this.servers;
 		welcomeSocket =  new ServerSocket(port);
 	}
 	
@@ -31,6 +29,14 @@ public class Server {
 		}
 	}
 
+	public static void main(String[] args){
+		try{
+			Server server = new Server(1122);
+			server.init();
+		}catch(Exception e){
+			e.printStackTrace();
+		}
+	}
 
 	
 	
