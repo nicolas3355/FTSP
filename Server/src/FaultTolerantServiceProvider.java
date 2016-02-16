@@ -6,7 +6,7 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 
 public class FaultTolerantServiceProvider {
-	private static final int PORT_NUMBER = 8888;
+	private static final int PORT_NUMBER = 1122;
 
 	private String mainIPAddress;
 	private String backupIPAddress;
