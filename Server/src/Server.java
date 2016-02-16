@@ -5,11 +5,10 @@ import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-
-
 public class Server {
-	
+
 	private int port;
+	private static String backupId = "127.0.0.1";
 	private String[] servers;
 	ServerSocket welcomeSocket;
 	
@@ -23,7 +22,7 @@ public class Server {
 		while (true){
 			Socket connectionSocket = welcomeSocket.accept();
 			try{
-				Worker worker = new Worker(connectionSocket);
+				Worker worker = new Worker(connectionSocket,backupId);
 				worker.run();
 			}
 			catch(Exception e){
