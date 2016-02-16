@@ -1,5 +1,9 @@
-import java.util.*;
-import java.io.*;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.net.Socket;
+import java.net.UnknownHostException;
 
 public class FaultTolerantServiceProvider {
 	private static final int PORT_NUMBER = 8888;
@@ -10,14 +14,14 @@ public class FaultTolerantServiceProvider {
 
 	// Constructs a Fault Tolerant Service Provider 
 	// using an IP Address for the main server.
-	public FaultTolerantServiceProvider(String ipAddress) {
+	public FaultTolerantServiceProvider(String ipAddress) throws UnknownHostException, IOException {
 		this.mainIPAddress = ipAddress;
 		this.usingBackup = false;
 
 		// Read the backup server IP from the main server.
 		Socket socket = new Socket(mainIPAddress, PORT_NUMBER);
 		ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-		this.backupIPAddress = in.readString();
+		this.backupIPAddress = in.readUTF();
 	}
 
 	// Returns the IP Address of the server we're currently
@@ -30,7 +34,7 @@ public class FaultTolerantServiceProvider {
 	}
 
 	// Forwards a service request to the active server.
-	public Pair<int, Object> forward(String className, String methodName, Serializable... params) {
+	public Pair<Integer, Object> forward(String className, String methodName, Serializable... params) throws UnknownHostException, IOException, ClassNotFoundException {
 		Socket socket = new Socket(getActiveIP(), PORT_NUMBER);
 		ObjectOutputStream outStream = new ObjectOutputStream(socket.getOutputStream());
 		
@@ -49,13 +53,14 @@ public class FaultTolerantServiceProvider {
 		// Block and wait for results from server.
 		ObjectInputStream inStream = new ObjectInputStream(socket.getInputStream());
 		int status = inStream.readInt();
+		
 		Object result = inStream.readObject();
 
-		return new Pair(status, result);
+		return new Pair<Integer,Object>(status, result);
 	}
 
 	public Object call(String className, String methodName, Serializable... params) throws Throwable {
-		Pair<int, Object> result = null;
+		Pair<Integer, Object> result = null;
 		try {
 			result = forward(className, methodName, params);
 		} catch (IOException e) {
@@ -71,20 +76,22 @@ public class FaultTolerantServiceProvider {
 				return result.second;
 			case 1:
 				if (result.second instanceof ClassNotFoundException) {
-					throw InvalidServiceException("Invalid service class name.");
+					throw new InvalidServiceException("Invalid service class name.");
 				} else if (result.second instanceof SecurityException) {
-					throw InvalidServiceException("Security violation.");
+					throw new InvalidServiceException("Security violation.");
 				} else if (result.second instanceof NoSuchMethodException) {
-					throw InvalidServiceException("Invalid service method name.");
+					throw new InvalidServiceException("Invalid service method name.");
 				} else if (result.second instanceof IllegalAccessException) {
-					throw InvalidServiceException("Cannot access service.");
+					throw new InvalidServiceException("Cannot access service.");
 				} else if (result.second instanceof IllegalArgumentException) {
-					throw InvalidParameterException("Bad parameters given to service.");
+					throw new InvalidParameterException("Bad parameters given to service.");
 				} else {
-					(Exception)(result.second).printStackTrace();
+					((Exception)(result.second)).printStackTrace();
 				}
 			case 2:
-				throw result.second.getCause();
+				throw ((Exception)result.second).getCause();
 		}
+		
+		return null;
 	}
 }
