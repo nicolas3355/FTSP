@@ -5,40 +5,44 @@ import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-public class Server {
 
-	private int port;
-	private static String backupId = "127.0.0.1";
-	ServerSocket welcomeSocket;
-	
-	public Server(int port) throws IOException{
-		this.port = port;
-		welcomeSocket =  new ServerSocket(port);
+public class Server {
+	private static final String BACKUP_SERVER = "127.0.0.1";
+	private static final int PORT_NUMBER = 1122;
+
+	private ServerSocket serverSocket;
+
+	// Creates a server that listens to 
+	// connections on a specified port.
+	public Server(int port) throws IOException {
+		this.serverSocket = new ServerSocket(port);
 	}
-	
-	public void init() throws IOException{
-		while (true){
-			Socket connectionSocket = welcomeSocket.accept();
-			try{
-				Worker worker = new Worker(connectionSocket,backupId);
-				worker.run();
+
+	// This method will actively listen 
+	// for new connections to the server, 
+	// and service requests.
+	public void init() throws IOException {
+		while (true) {
+			System.out.println("[Server] Listening...");
+			Socket socket = serverSocket.accept();
+			try {
+				// Spawn a worker thread.
+				Worker worker = new Worker(socket, BACKUP_SERVER);
+				worker.start();
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
-			catch(Exception e){
-				
-			}
+			System.out.println("[Server] Serviced Request.");
 		}
 	}
 
+	// Server main function.
 	public static void main(String[] args){
-		try{
-			Server server = new Server(1122);
+		try {
+			Server server = new Server(PORT_NUMBER);
 			server.init();
-		}catch(Exception e){
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
-
-	
-	
-	
 }

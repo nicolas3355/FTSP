@@ -10,71 +10,80 @@ public class FaultTolerantServiceProvider {
 
 	private String mainIPAddress;
 	private String backupIPAddress;
-	private boolean usingBackup;
-
+	
 	// Constructs a Fault Tolerant Service Provider 
 	// using an IP Address for the main server.
-	public FaultTolerantServiceProvider(String ipAddress) throws UnknownHostException, IOException {
+	public FaultTolerantServiceProvider(String ipAddress) {
 		this.mainIPAddress = ipAddress;
-		this.usingBackup = false;
-
-		// Read the backup server IP from the main server.
-		Socket socket = new Socket(mainIPAddress, PORT_NUMBER);
-		ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-		this.backupIPAddress = in.readUTF();
-	}
-
-	// Returns the IP Address of the server we're currently
-	// going to use during the call routine execution. If 
-	// everything is going fine, this will return the main 
-	// server IP address. If the main server fails, the 
-	// backup IP address will be returned.
-	public String getActiveIP() {
-		return usingBackup? backupIPAddress : mainIPAddress;
+		this.backupIPAddress = this.mainIPAddress;
 	}
 
 	// Forwards a service request to the active server.
-	public Pair<Integer, Object> forward(String className, String methodName, Serializable... params) throws UnknownHostException, IOException, ClassNotFoundException {
-		Socket socket = new Socket(getActiveIP(), PORT_NUMBER);
-		ObjectOutputStream outStream = new ObjectOutputStream(socket.getOutputStream());
-		
-		// The number of objects we're going to stream 
-		// to the current server to handle the request.
-		Integer count = params.length + 2;
+	public Pair<Integer, Object> forward(String ip, String methodName, Serializable... params)
+		throws UnknownHostException, IOException, InvalidServiceException
+	{
+		Socket socket = new Socket(ip, PORT_NUMBER);
 
+		// Read the Backup IP Address from the server.
+		ObjectInputStream inStream = new ObjectInputStream(socket.getInputStream());
+		this.backupIPAddress = inStream.readUTF();
+		
 		// Send the request information to the server.
-		outStream.writeObject(count);
-		outStream.writeObject(className);
-		outStream.writeObject(methodName);
+		ObjectOutputStream outStream = new ObjectOutputStream(socket.getOutputStream());
+		outStream.writeInt(params.length);
+		outStream.writeUTF(methodName);
 		for (Serializable o : params) {
 			outStream.writeObject(o);
 		}
+		outStream.flush();
 
-		// Block and wait for results from server.
-		ObjectInputStream inStream = new ObjectInputStream(socket.getInputStream());
-		int status = inStream.readInt();
-		
-		Object result = inStream.readObject();
+		// Wait for server response, and get 
+		// the status of the service, along 
+		// with the result.
+		Integer status = inStream.readInt();
+		Object result = null;
+
+		try {
+			result = inStream.readObject();
+		} catch (ClassNotFoundException e) {
+			throw new InvalidServiceException("Result Type Invalid.");
+		}
+
+		// Close the streams.
+		inStream.close();
+		outStream.close();
 
 		return new Pair<Integer,Object>(status, result);
 	}
 
-	public Object call(String className, String methodName, Serializable... params) throws Throwable {
+	// Provides a service for the client given 
+	// a service method name, and a sequence 
+	// of parameters for the service.
+	public Object call(String methodName, Serializable... params)
+		throws InvalidServiceException, InvalidParameterException, Throwable
+	{
 		Pair<Integer, Object> result = null;
+
+		// Forward the request to the main server.
+		// If something goes wrong, we will reforward 
+		// this request to the backup server, and assume 
+		// that everything will go smoothly for the 
+		// purpose of this assignment.
 		try {
-			result = forward(className, methodName, params);
+			result = forward(mainIPAddress, methodName, params);
 		} catch (IOException e) {
-			usingBackup = true;
-			result = forward(className, methodName, params);
-			usingBackup = false;
+			result = forward(backupIPAddress, methodName, params);
 		}
 
 		// If the job was successful, we return the result.
 		// Otherwise, we throw exceptions appropriately.
 		switch (result.first) {
-			case 0:
+			case Status.SUCCESS:
 				return result.second;
-			case 1:
+			case Status.PROVIDER_FAILURE:
+				// This will map the exceptions related to reflection 
+				// to our exceptions because we wish to hide the 
+				// implementation details of this service provider.
 				if (result.second instanceof ClassNotFoundException) {
 					throw new InvalidServiceException("Invalid service class name.");
 				} else if (result.second instanceof SecurityException) {
@@ -88,7 +97,8 @@ public class FaultTolerantServiceProvider {
 				} else {
 					((Exception)(result.second)).printStackTrace();
 				}
-			case 2:
+			case Status.SERVICE_FAILURE:
+				// The service itself threw an exception.
 				throw ((Exception)result.second).getCause();
 		}
 		
