@@ -73,6 +73,7 @@ public class Worker extends Thread {
 
 	// This function will determine the type of an Object
 	// with priority to assigning primitive types.
+	// TODO: Refactor this to be cleaner.
 	public static Class determineType(Object o) {
 		if (o instanceof Integer)        return int.class;
 		else if (o instanceof Byte)      return byte.class;
